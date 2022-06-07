@@ -3,7 +3,7 @@ import React from "react";
 
 const ClearButton = ({ resetViewAndFlagCount }) => {
   const resetBoard = async () =>
-    await resetViewAndFlagCount(await invoke("reset", { mineCount: 20 }));
+    await resetViewAndFlagCount(await invoke("reset", { mineCount: 2 }));
 
   return (
     <div
