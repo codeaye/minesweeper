@@ -16,7 +16,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             view, open, flag, flag_count, reset, won, lost
         ])
-        .manage(MineState(Mutex::new(Minesweeper::new(10, 10, 20))))
+        .manage(MineState(Mutex::new(Minesweeper::new(10, 10, 10))))
         .run(tauri::generate_context!())
         .expect("Error while running tauri application");
 }
@@ -36,9 +36,9 @@ fn flag(x: usize, y: usize, state: tauri::State<MineState>) -> Vec<MinesweeperVi
 }
 
 #[tauri::command]
-fn reset(mine_count: usize, state: tauri::State<MineState>) -> Vec<MinesweeperView> {
+fn reset(state: tauri::State<MineState>) -> Vec<MinesweeperView> {
     let mut game = state.0.lock().unwrap();
-    game.reset(mine_count);
+    game.reset();
     game.view()
 }
 

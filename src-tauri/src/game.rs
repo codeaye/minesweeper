@@ -16,8 +16,10 @@ pub struct Minesweeper {
     open_fields: HashSet<Position>,
     mines: HashSet<Position>,
     flagged_fields: HashSet<Position>,
+    mine_count: usize,
     lost: bool,
     won: bool,
+    first: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -34,19 +36,33 @@ impl Minesweeper {
             width,
             height,
             open_fields: HashSet::new(),
-            mines: {
-                let mut mines = HashSet::new();
-
-                while mines.len() < mine_count {
-                    mines.insert((random_range(0, width), random_range(0, height)));
-                }
-
-                mines
-            },
+            mines: HashSet::new(),
             flagged_fields: HashSet::new(),
             lost: false,
             won: false,
+            mine_count,
+            first: true,
         }
+    }
+
+    pub fn initiate_fields(&mut self, start: Position) -> Option<OpenResult> {
+        self.mines = {
+            let mut mines = HashSet::new();
+            let mut i: usize = 0;
+
+            while i < self.mine_count {
+                let pos: Position = (random_range(0, self.width), random_range(0, self.height));
+
+                if pos != start && !mines.contains(&pos) {
+                    mines.insert(pos);
+                    i += 1;
+                }
+            }
+
+            mines
+        };
+        self.first = false;
+        self.open(start)
     }
 
     pub fn view(&self) -> Vec<MinesweeperView> {
@@ -113,20 +129,13 @@ impl Minesweeper {
         self.flagged_fields.len()
     }
 
-    pub fn reset(&mut self, mine_count: usize) {
+    pub fn reset(&mut self) {
         self.open_fields.clear();
         self.flagged_fields.clear();
+        self.mines.clear();
         self.lost = false;
         self.won = false;
-        self.mines = {
-            let mut mines = HashSet::new();
-
-            while mines.len() < mine_count {
-                mines.insert((random_range(0, self.width), random_range(0, self.height)));
-            }
-
-            mines
-        }
+        self.first = true;
     }
 
     pub fn iter_neighbors(&self, (x, y): Position) -> impl Iterator<Item = Position> {
@@ -145,49 +154,53 @@ impl Minesweeper {
     }
 
     pub fn open(&mut self, pos: Position) -> Option<OpenResult> {
-        if self.open_fields.contains(&pos) {
-            let mine_count = self.neighboring_mines(pos);
-            let flag_count = self
-                .iter_neighbors(pos)
-                .filter(|neighbor| self.flagged_fields.contains(neighbor))
-                .count() as u8;
+        if self.first == false {
+            if self.open_fields.contains(&pos) {
+                let mine_count = self.neighboring_mines(pos);
+                let flag_count = self
+                    .iter_neighbors(pos)
+                    .filter(|neighbor| self.flagged_fields.contains(neighbor))
+                    .count() as u8;
 
-            if mine_count == flag_count {
-                for neighbor in self.iter_neighbors(pos) {
-                    if !self.flagged_fields.contains(&neighbor)
-                        && !self.open_fields.contains(&neighbor)
-                    {
-                        self.open(neighbor);
+                if mine_count == flag_count {
+                    for neighbor in self.iter_neighbors(pos) {
+                        if !self.flagged_fields.contains(&neighbor)
+                            && !self.open_fields.contains(&neighbor)
+                        {
+                            self.open(neighbor);
+                        }
                     }
                 }
+
+                return None;
             }
 
-            return None;
-        }
+            if self.lost || self.flagged_fields.contains(&pos) {
+                return None;
+            }
 
-        if self.lost || self.flagged_fields.contains(&pos) {
-            return None;
-        }
+            self.open_fields.insert(pos);
 
-        self.open_fields.insert(pos);
+            let is_mine = self.mines.contains(&pos);
 
-        let is_mine = self.mines.contains(&pos);
+            if is_mine {
+                self.lost = true;
+                Some(OpenResult::Mine)
+            } else {
+                let mine_count = self.neighboring_mines(pos);
 
-        if is_mine {
-            self.lost = true;
-            Some(OpenResult::Mine)
+                if mine_count == 0 {
+                    for neighbor in self.iter_neighbors(pos) {
+                        if !self.open_fields.contains(&neighbor) {
+                            self.open(neighbor);
+                        }
+                    }
+                }
+
+                Some(OpenResult::NoMine(mine_count))
+            }
         } else {
-            let mine_count = self.neighboring_mines(pos);
-
-            if mine_count == 0 {
-                for neighbor in self.iter_neighbors(pos) {
-                    if !self.open_fields.contains(&neighbor) {
-                        self.open(neighbor);
-                    }
-                }
-            }
-
-            Some(OpenResult::NoMine(mine_count))
+            self.initiate_fields(pos)
         }
     }
 
