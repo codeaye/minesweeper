@@ -4,7 +4,6 @@
 )]
 
 mod game;
-mod random;
 use std::sync::Mutex;
 
 use game::{Minesweeper, MinesweeperView};
